@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUS Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    }
+                }
+            }
+        }
+
+        // Check for dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+    <style>
+        .custom-radio:checked {
+            background-color: #5D5CDE;
+            border-color: #5D5CDE;
+        }
+        
+        /* Dark mode styles */
+        .dark .custom-radio:checked {
+            background-color: #5D5CDE;
+            border-color: #5D5CDE;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-white dark:bg-gray-900 dark:text-white transition-colors duration-200">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center text-primary dark:text-primary mb-8">System Usability Scale (SUS) Calculator</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left column: Input form -->
+            <div class="col-span-1 lg:col-span-2">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Input Data SUS</h2>
+                    
+                    <div class="mb-4">
+                        <button id="addParticipantBtn" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md">
+                            Tambah Responden
+                        </button>
+                        <button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md ml-2">
+                            Reset Data
+                        </button>
+                    </div>
+                    
+                    <div id="participantsList" class="space-y-4 mb-4">
+                        <!-- Participant entries will be added here -->
+                    </div>
+                    
+                    <template id="participantTemplate">
+                        <div class="participant-entry bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                            <div class="flex justify-between mb-3">
+                                <h3 class="text-lg font-medium">Responden <span class="participant-number"></span></h3>
+                                <button class="delete-participant text-red-500 hover:text-red-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                                <div>
+                                    <label class="block mb-1">Nama (Opsional)</label>
+                                    <input type="text" class="participant-name w-full px-3 py-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white text-base">
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Pekerjaan</label>
+                                    <input type="text" class="participant-job w-full px-3 py-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white text-base">
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-left py-2">Pertanyaan</th>
+                                            <th class="text-center py-2 w-16">1<br><span class="text-xs">Sangat Tidak Setuju</span></th>
+                                            <th class="text-center py-2 w-16">2</th>
+                                            <th class="text-center py-2 w-16">3</th>
+                                            <th class="text-center py-2 w-16">4</th>
+                                            <th class="text-center py-2 w-16">5<br><span class="text-xs">Sangat Setuju</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- SUS Questions -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Right column: Results and export -->
+            <div class="col-span-1">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Hasil Perhitungan</h2>
+                    
+                    <div class="mb-4">
+                        <p class="mb-2">Jumlah Responden: <span id="totalParticipants" class="font-semibold">0</span></p>
+                        <p class="mb-2">Rata-rata Skor SUS: <span id="averageSusScore" class="font-semibold">0</span></p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h3 class="text-lg font-medium mb-2">Interpretasi Skor</h3>
+                        <div id="scoreInterpretation" class="p-3 rounded-md bg-gray-100 dark:bg-gray-700">
+                            Belum ada data
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <button id="exportExcelBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md mb-2 flex items-center justify-center" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Export ke Excel
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">Grafik Hasil</h2>
+                    <div class="mb-4">
+                        <canvas id="susScoreChart" height="200"></canvas>
+                    </div>
+                    <div class="mb-4">
+                        <canvas id="questionScoreChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // SUS questions
+        const susQuestions = [
+            "Saya berpikir akan menggunakan sistem ini lagi",
+            "Saya merasa sistem ini rumit untuk digunakan",
+            "Saya merasa sistem ini mudah digunakan",
+            "Saya membutuhkan bantuan dari orang lain atau teknisi dalam menggunakan sistem ini",
+            "Saya merasa fitur-fitur sistem ini berjalan dengan semestinya",
+            "Saya merasa ada banyak hal yang tidak konsisten (tidak serasi) pada sistem ini",
+            "Saya merasa orang lain akan memahami cara menggunakan sistem ini dengan cepat",
+            "Saya merasa sistem ini membingungkan",
+            "Saya merasa tidak ada hambatan dalam menggunakan sistem ini",
+            "Saya perlu membiasakan diri terlebih dahulu sebelum menggunakan sistem ini"
+        ];
+
+        // Data structure to store participants' information
+        let participants = [];
+        let susScoreChart = null;
+        let questionScoreChart = null;
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners
+            document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
+            document.getElementById('resetBtn').addEventListener('click', resetData);
+            document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+            
+            // Initialize charts
+            initializeCharts();
+            
+            // Add first participant by default
+            addParticipant();
+        });
+
+        // Function to add a new participant
+        function addParticipant() {
+            const participantsList = document.getElementById('participantsList');
+            const template = document.getElementById('participantTemplate');
+            const clone = template.content.cloneNode(true);
+            
+            const participantNumber = participants.length + 1;
+            clone.querySelector('.participant-number').textContent = participantNumber;
+            
+            // Generate SUS questions and radio buttons
+            const tableBody = clone.querySelector('tbody');
+            susQuestions.forEach((question, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="py-2">${index + 1}. ${question}</td>
+                    ${[1, 2, 3, 4, 5].map(value => `
+                        <td class="text-center">
+                            <input type="radio" name="q${participantNumber}_${index}" value="${value}" 
+                                class="custom-radio h-4 w-4 text-primary focus:ring-primary"
+                                onchange="updateCalculations()">
+                        </td>
+                    `).join('')}
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // Add delete event listener
+            const participant = {
+                id: participantNumber,
+                name: '',
+                job: '',
+                responses: Array(10).fill(0)
+            };
+            participants.push(participant);
+            
+            participantsList.appendChild(clone);
+            
+            const participantEntry = participantsList.lastElementChild;
+            
+            // Add event listeners for inputs
+            participantEntry.querySelector('.participant-name').addEventListener('input', function(e) {
+                participant.name = e.target.value;
+                updateCalculations();
+            });
+            
+            participantEntry.querySelector('.participant-job').addEventListener('input', function(e) {
+                participant.job = e.target.value;
+                updateCalculations();
+            });
+            
+            participantEntry.querySelector('.delete-participant').addEventListener('click', function() {
+                deleteParticipant(participantEntry, participant.id);
+            });
+            
+            // Add event listeners for all radio buttons
+            const radioButtons = participantEntry.querySelectorAll('input[type="radio"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const questionIndex = parseInt(this.name.split('_')[1]);
+                    participant.responses[questionIndex] = parseInt(this.value);
+                    updateCalculations();
+                });
+            });
+            
+            updateCalculations();
+        }
+
+        // Function to delete a participant
+        function deleteParticipant(element, id) {
+            if (participants.length <= 1) {
+                alert('Minimal harus ada satu responden!');
+                return;
+            }
+            
+            // Remove from DOM
+            element.remove();
+            
+            // Remove from data array
+            const index = participants.findIndex(p => p.id === id);
+            if (index !== -1) {
+                participants.splice(index, 1);
+            }
+            
+            // Re-number the remaining participants
+            const participantEntries = document.querySelectorAll('.participant-entry');
+            participantEntries.forEach((entry, i) => {
+                entry.querySelector('.participant-number').textContent = i + 1;
+            });
+            
+            updateCalculations();
+        }
+
+        // Function to reset all data
+        function resetData() {
+            if (confirm('Anda yakin ingin menghapus semua data?')) {
+                participants = [];
+                document.getElementById('participantsList').innerHTML = '';
+                addParticipant();
+                updateCalculations();
+            }
+        }
+
+        // Calculate SUS score for a single participant
+        function calculateSUSScore(responses) {
+            if (responses.includes(0)) {
+                return null; // Not all questions answered
+            }
+            
+            let score = 0;
+            
+            // For odd-numbered questions (0, 2, 4, 6, 8 in zero-based index)
+            // Score is the scale position minus 1
+            for (let i = 0; i < responses.length; i += 2) {
+                score += responses[i] - 1;
+            }
+            
+            // For even-numbered questions (1, 3, 5, 7, 9 in zero-based index)
+            // Score is 5 minus the scale position
+            for (let i = 1; i < responses.length; i += 2) {
+                score += 5 - responses[i];
+            }
+            
+            // Multiply the sum by 2.5 to get the SUS score
+            return score * 2.5;
+        }
+
+        // Update all calculations and charts
+        function updateCalculations() {
+            const totalParticipants = document.getElementById('totalParticipants');
+            const averageSusScore = document.getElementById('averageSusScore');
+            const scoreInterpretation = document.getElementById('scoreInterpretation');
+            const exportExcelBtn = document.getElementById('exportExcelBtn');
+            
+            // Calculate scores
+            const scores = participants.map(p => calculateSUSScore(p.responses)).filter(score => score !== null);
+            const validParticipants = scores.length;
+            
+            totalParticipants.textContent = validParticipants;
+            
+            if (validParticipants === 0) {
+                averageSusScore.textContent = '0';
+                scoreInterpretation.textContent = 'Belum ada data';
+                exportExcelBtn.disabled = true;
+            } else {
+                const average = scores.reduce((a, b) => a + b, 0) / validParticipants;
+                averageSusScore.textContent = average.toFixed(2);
+                
+                // Interpret the score
+                let interpretation;
+                if (average >= 85) {
+                    interpretation = 'Sangat Baik (A+): Pengguna sangat puas dengan sistem';
+                    scoreInterpretation.className = 'p-3 rounded-md bg-green-100 dark:bg-green-800';
+                } else if (average >= 72) {
+                    interpretation = 'Baik (B): Pengguna puas dengan sistem';
+                    scoreInterpretation.className = 'p-3 rounded-md bg-green-100 dark:bg-green-800';
+                } else if (average >= 68) {
+                    interpretation = 'Cukup (C): Sistem memenuhi standar usabilitas minimum';
+                    scoreInterpretation.className = 'p-3 rounded-md bg-yellow-100 dark:bg-yellow-800';
+                } else if (average >= 51) {
+                    interpretation = 'Kurang (D): Sistem memiliki masalah usabilitas yang perlu diperbaiki';
+                    scoreInterpretation.className = 'p-3 rounded-md bg-orange-100 dark:bg-orange-800';
+                } else {
+                    interpretation = 'Buruk (F): Sistem memiliki masalah usabilitas yang serius';
+                    scoreInterpretation.className = 'p-3 rounded-md bg-red-100 dark:bg-red-800';
+                }
+                
+                scoreInterpretation.textContent = interpretation;
+                exportExcelBtn.disabled = false;
+            }
+            
+            // Update charts
+            updateCharts();
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // SUS Score Chart
+            const susScoreCtx = document.getElementById('susScoreChart').getContext('2d');
+            susScoreChart = new Chart(susScoreCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Skor SUS'],
+                    datasets: [{
+                        label: 'Skor SUS Rata-rata',
+                        data: [0],
+                        backgroundColor: '#5D5CDE',
+                        borderColor: '#4a49b1',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Skor'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Question Score Chart
+            const questionScoreCtx = document.getElementById('questionScoreChart').getContext('2d');
+            questionScoreChart = new Chart(questionScoreCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10'],
+                    datasets: [{
+                        label: 'Rata-rata Skor per Pertanyaan',
+                        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(93, 92, 222, 0.2)',
+                        borderColor: '#5D5CDE',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#5D5CDE'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 5
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update charts with new data
+        function updateCharts() {
+            // Filter out participants with incomplete responses
+            const validParticipants = participants.filter(p => !p.responses.includes(0));
+            
+            if (validParticipants.length === 0) {
+                // Reset charts if no valid data
+                susScoreChart.data.datasets[0].data = [0];
+                questionScoreChart.data.datasets[0].data = Array(10).fill(0);
+            } else {
+                // Calculate average SUS score
+                const scores = validParticipants.map(p => calculateSUSScore(p.responses));
+                const averageSUS = scores.reduce((a, b) => a + b, 0) / scores.length;
+                
+                // Update SUS score chart
+                susScoreChart.data.datasets[0].data = [averageSUS];
+                susScoreChart.data.datasets[0].backgroundColor = '#5D5CDE';
+                susScoreChart.data.datasets[0].borderColor = '#4a49b1';
+                
+                // Update SUS score chart options for better appearance
+                susScoreChart.options.plugins = {
+                    title: {
+                        display: true,
+                        text: 'Rata-rata Skor SUS',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                };
+                
+                // Calculate average score for each question
+                const questionAverages = [];
+                for (let i = 0; i < 10; i++) {
+                    const questionScores = validParticipants.map(p => p.responses[i]);
+                    const average = questionScores.reduce((a, b) => a + b, 0) / questionScores.length;
+                    questionAverages.push(average);
+                }
+                
+                // Update question score chart
+                questionScoreChart.data.datasets[0].data = questionAverages;
+                questionScoreChart.options.plugins = {
+                    title: {
+                        display: true,
+                        text: 'Rata-rata Skor per Pertanyaan',
+                        font: {
+                            size: 16
+                        }
+                    }
+                };
+            }
+            
+            // Update charts
+            susScoreChart.update();
+            questionScoreChart.update();
+        }
+
+        // Function to export chart as image
+        function chartToImage(chart) {
+            return new Promise((resolve) => {
+                // Create an image from the chart
+                const image = chart.toBase64Image('image/png', 1.0);
+                resolve(image);
+            });
+        }
+        
+        // Function to convert base64 to array buffer
+        function base64ToArrayBuffer(base64) {
+            const binary_string = window.atob(base64.split(',')[1]);
+            const len = binary_string.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary_string.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // Export data to Excel with charts
+        async function exportToExcel() {
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            wb.Props = {
+                Title: "System Usability Scale Data",
+                Author: "SUS Calculator",
+                CreatedDate: new Date()
+            };
+            
+            // Prepare data for participants worksheet with formatting
+            const participantsData = [
+                ['ID', 'Nama', 'Pekerjaan', 'Skor SUS']
+            ];
+            
+            participants.forEach(p => {
+                const susScore = calculateSUSScore(p.responses);
+                participantsData.push([
+                    p.id,
+                    p.name,
+                    p.job,
+                    susScore !== null ? susScore : 'Tidak Lengkap'
+                ]);
+            });
+            
+            // Create responses worksheet with better formatting
+            const responsesData = [];
+            // Add header row with styling
+            responsesData.push(['ID', 'Nama', 'Pekerjaan', ...Array.from({length: 10}, (_, i) => `Q${i+1}`), 'Skor SUS']);
+            
+            participants.forEach(p => {
+                const susScore = calculateSUSScore(p.responses);
+                responsesData.push([
+                    p.id,
+                    p.name,
+                    p.job,
+                    ...p.responses,
+                    susScore !== null ? susScore : 'Tidak Lengkap'
+                ]);
+            });
+            
+            // Create questions worksheet
+            const questionsData = [
+                ['No', 'Pertanyaan']
+            ];
+            
+            susQuestions.forEach((q, i) => {
+                questionsData.push([i+1, q]);
+            });
+            
+            // Prepare data for summary worksheet with table formatting
+            const validParticipants = participants.filter(p => !p.responses.includes(0));
+            const scores = validParticipants.map(p => calculateSUSScore(p.responses));
+            const averageSUS = validParticipants.length > 0 ? 
+                scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+            
+            const summaryData = [
+                ['Jumlah Responden', validParticipants.length],
+                ['Rata-rata Skor SUS', averageSUS.toFixed(2)],
+                [],
+                ['Interpretasi Skor', ''],
+                ['Rentang Skor', 'Interpretasi'],
+                ['85-100', 'Sangat Baik (A+): Pengguna sangat puas dengan sistem'],
+                ['72-84', 'Baik (B): Pengguna puas dengan sistem'],
+                ['68-71', 'Cukup (C): Sistem memenuhi standar usabilitas minimum'],
+                ['51-67', 'Kurang (D): Sistem memiliki masalah usabilitas yang perlu diperbaiki'],
+                ['0-50', 'Buruk (F): Sistem memiliki masalah usabilitas yang serius']
+            ];
+            
+            // Export chart images
+            // Get chart images
+            const susScoreChartImg = await chartToImage(susScoreChart);
+            const questionScoreChartImg = await chartToImage(questionScoreChart);
+            
+            // Add worksheets to workbook
+            wb.SheetNames.push("Ringkasan");
+            const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+            
+            // Apply some styling to the summary sheet
+            if(!summaryWs['!cols']) summaryWs['!cols'] = [];
+            summaryWs['!cols'][0] = { wch: 15 }; // Width of column A
+            summaryWs['!cols'][1] = { wch: 50 }; // Width of column B
+            
+            wb.Sheets["Ringkasan"] = summaryWs;
+            
+            wb.SheetNames.push("Responden");
+            const respWs = XLSX.utils.aoa_to_sheet(participantsData);
+            
+            // Add some styling for the responden sheet
+            if(!respWs['!cols']) respWs['!cols'] = [];
+            respWs['!cols'][0] = { wch: 5 }; // ID column
+            respWs['!cols'][1] = { wch: 20 }; // Nama column
+            respWs['!cols'][2] = { wch: 20 }; // Pekerjaan column
+            respWs['!cols'][3] = { wch: 10 }; // Skor SUS column
+            
+            wb.Sheets["Responden"] = respWs;
+            
+            wb.SheetNames.push("Jawaban");
+            const jawWs = XLSX.utils.aoa_to_sheet(responsesData);
+            
+            // Add some styling for the jawaban sheet
+            if(!jawWs['!cols']) jawWs['!cols'] = [];
+            jawWs['!cols'][0] = { wch: 5 }; // ID column
+            jawWs['!cols'][1] = { wch: 20 }; // Nama column
+            jawWs['!cols'][2] = { wch: 20 }; // Pekerjaan column
+            // Q1-Q10 columns
+            for(let i = 3; i < 13; i++) {
+                jawWs['!cols'][i] = { wch: 5 };
+            }
+            jawWs['!cols'][13] = { wch: 10 }; // Skor SUS column
+            
+            wb.Sheets["Jawaban"] = jawWs;
+            
+            wb.SheetNames.push("Pertanyaan");
+            const pertWs = XLSX.utils.aoa_to_sheet(questionsData);
+            
+            // Add some styling for the pertanyaan sheet
+            if(!pertWs['!cols']) pertWs['!cols'] = [];
+            pertWs['!cols'][0] = { wch: 5 }; // No column
+            pertWs['!cols'][1] = { wch: 70 }; // Pertanyaan column
+            
+            wb.Sheets["Pertanyaan"] = pertWs;
+            
+            // Create Charts worksheet
+            wb.SheetNames.push("Grafik");
+            wb.Sheets["Grafik"] = XLSX.utils.aoa_to_sheet([
+                ["Grafik Skor SUS"],
+                [""],
+                ["Grafik Skor per Pertanyaan"],
+                [""]
+            ]);
+            
+            // Generate Excel file
+            const wbout = XLSX.write(wb, {bookType:'xlsx', type:'binary'});
+            
+            // Create a download link
+            function s2ab(s) {
+                const buf = new ArrayBuffer(s.length);
+                const view = new Uint8Array(buf);
+                for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+                return buf;
+            }
+            
+            const blob = new Blob([s2ab(wbout)], {type:"application/octet-stream"});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "SUS_Data.xlsx";
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+            
+            // Also provide option to download charts separately
+            exportChartImages();
+        }
+        
+        // Function to export chart images
+        function exportChartImages() {
+            // Create and add buttons to download chart images
+            const exportBtnContainer = document.createElement('div');
+            exportBtnContainer.className = 'flex flex-col gap-2 mt-4';
+            exportBtnContainer.innerHTML = `
+                <button id="exportSusChartBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                    </svg>
+                    Download Grafik Skor SUS
+                </button>
+                <button id="exportQuestionChartBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                    </svg>
+                    Download Grafik Skor per Pertanyaan
+                </button>
+            `;
+            
+            // Find export button and insert the new buttons after it
+            const exportExcelBtn = document.getElementById('exportExcelBtn');
+            exportExcelBtn.parentNode.appendChild(exportBtnContainer);
+            
+            // Add event listeners to download chart images
+            document.getElementById('exportSusChartBtn').addEventListener('click', function() {
+                downloadChartAsImage(susScoreChart, 'sus_score_chart.png');
+            });
+            
+            document.getElementById('exportQuestionChartBtn').addEventListener('click', function() {
+                downloadChartAsImage(questionScoreChart, 'question_score_chart.png');
+            });
+        }
+        
+        // Download chart as image
+        function downloadChartAsImage(chart, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = chart.toBase64Image('image/png', 1.0);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
